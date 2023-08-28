@@ -27,7 +27,8 @@ exports.modifyBook = (req, res, next) => {
         // parse the string
         ...JSON.parse(req.body.book),
         // create URL for image
-        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
+        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`,
+
     } : { ...req.body }; // if no file just to the object in req.body
 
     delete bookObject._userId; // for security reasons
@@ -38,11 +39,20 @@ exports.modifyBook = (req, res, next) => {
             if (book.userId != req.auth.userId) {
                 res.status(403).json({ message : 'Unauthorized request'});
             } else {
-                // use methode updateOne, argument1: object that we need to modify, argument2: new version of the object, precise the id, the one in the req might not be the right one)
-                Book.updateOne({ _id: req.params.id}, { ...bookObject, _id: req.params.id})
-                .then(() => res.status(200).json({message : 'Objet modifié!'}))
-                .catch(error => res.status(401).json({ error }));
-            }
+                const update = () => {
+                    Book.updateOne({ _id: req.params.id}, { ...bookObject, _id: req.params.id})
+                    .then(() => res.status(200).json({message : 'Objet modifié!'}))
+                    .catch(error => res.status(401).json({ error }));
+                };
+                if(req.file) {
+                let oldImageName = book.imageUrl.split('/images/')[1];
+                // console.log("OLD IMAGE NAME " + oldImageName);
+                fs.unlink(`images/${oldImageName}`, update);
+                } else {
+                     // use methode updateOne, argument1: object that we need to modify, argument2: new version of the object, precise the id, the one in the req might not be the right one)
+                    update();
+                    }
+                }
         })
         .catch((error) => {
             res.status(400).json({ error });
@@ -59,6 +69,7 @@ exports.modifyBook = (req, res, next) => {
                 // if yes: delete file linked to book
                 // get the file name from the url
                 const filename = book.imageUrl.split('/images/')[1];
+                console.log("DELETED FILE NAME " + filename);
                 // delete the file with unlink methode
                 fs.unlink(`images/${filename}`, () => {
                     // delete object in DB
